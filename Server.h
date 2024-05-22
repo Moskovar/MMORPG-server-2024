@@ -7,6 +7,7 @@
 #include <mutex>
 #include "Player.h"
 
+
 #pragma comment(lib, "ws2_32.lib")
 
 using namespace std;
@@ -30,12 +31,15 @@ class Server
 
 		struct addrinfo* result = NULL;
 		struct addrinfo  hints;
+		struct sockaddr_in servaddr, cliaddr;
 
 		mutex mtx;
-		thread* t_check_clients  = nullptr;
-		void check_clients();
-
-		thread* t_listen_clients = nullptr;
-		void listen_clients();
+		thread* t_check_connections = nullptr;
+		thread* t_listen_clientsTCP = nullptr;
+		thread* t_listen_clientsUDP = nullptr;
+		thread* t_send_clientsUDP   = nullptr;
+		void listen_clientsTCP();
+		void liste_clientsUDP();
+		void send_clientsUDP();
 };
 

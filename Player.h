@@ -5,21 +5,24 @@
 
 using namespace std;
 
+struct NetworkEntity {
+	int id = 0, x = 0, y = 0;
+};
+
 class Player
 {
 public:
-	Player(SOCKET* tcpSocket, SOCKET* udpSocket);
+	Player(SOCKET* tcpSocket, NetworkEntity networkEntity);
 	~Player();
 
 	bool isSocketValid() { return !(*tcpSocket == INVALID_SOCKET); }
 	SOCKET* getTCPSocket() { return this->tcpSocket; }
 
-	void sendTCP(const char* sendbuf);
-	void sendUDP(const char* sendbuf);
-	bool recvTCP();
+	void sendStructTCP(NetworkEntity& ne);
+	int recvTCP();
 
 private:
 	SOCKET* tcpSocket = nullptr;
-	SOCKET* udpSocket = nullptr;
+	NetworkEntity networkEntity;
 };
 
