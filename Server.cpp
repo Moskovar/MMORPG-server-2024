@@ -243,11 +243,16 @@ void Server::listen_clientsTCP()
                         it->second->recvBuffer.erase(it->second->recvBuffer.begin(), it->second->recvBuffer.begin() + sizeof(NetworkEntity));
                     }
                 } else if (iResult == 0 || iResult == SOCKET_ERROR) {
-                    mtx_sendNETCP.lock();
-                    delete it->second;
-                    it->second = nullptr;
+                    //mtx_sendNETCP.lock();
+                    NetworkEntity ne{ it->second->getID(), 0, 0, 0, -1 };
+                    if (it->second)
+                    {
+                        delete it->second;
+                        it->second = nullptr;
+                    }
                     it = players.erase(it);
-                    mtx_sendNETCP.unlock();
+                    send_NETCP(ne);//on envoie le signalement de deconnexion du joueur avec un timestamp à -1 (= deconnexion)
+                    //mtx_sendNETCP.unlock();
                     std::cout << "A client has been disconnected, " << players.size() << " left" << std::endl;
                     continue;
                 }
@@ -374,11 +379,11 @@ void Server::send_NEUDP()
 
 void Server::send_NETCP(NetworkEntity& ne)
 {
-    mtx_sendNETCP.lock();
+    //mtx_sendNETCP.lock();
     for (auto it = players.begin(); it != players.end(); ++it)
     {
         it->second->sendNETCP(ne);
     }
-    mtx_sendNETCP.unlock();
+    //mtx_sendNETCP.unlock();
 }
 
