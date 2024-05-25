@@ -2,7 +2,7 @@
 
 int main() {
     Server server;
-    server.listen();
+    server.accept_connections();
 
     return 0;
 }

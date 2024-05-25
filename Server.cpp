@@ -1,4 +1,5 @@
 #include "Server.h"
+#include <ctime>
 
 Server::Server()//gérer les erreurs avec des exceptions
 {
@@ -9,69 +10,69 @@ Server::Server()//gérer les erreurs avec des exceptions
         exit(1);
     }
 
-    ZeroMemory(&hints, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = AI_PASSIVE;
-
-    // Résoudre l'adresse et le port du serveur
-    iResult = getaddrinfo(NULL, "27015", &hints, &result);
-    if (iResult != 0) {
-        std::cerr << "getaddrinfo failed: " << iResult << std::endl;
-        WSACleanup();
-        exit(1);
-    }
-
-    // Créer un socket pour se connecter au serveur
-    connectionSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    //--- TCP SOCKET ---//
+    // Initialisation du socket TCP
+    connectionSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (connectionSocket == INVALID_SOCKET) {
-        std::cerr << "Error at socket(): " << WSAGetLastError() << std::endl;
-        freeaddrinfo(result);
+        std::cerr << "Erreur lors de la création du socket TCP" << std::endl;
         WSACleanup();
         exit(1);
     }
 
-    // Configurer le socket pour écouter
-    iResult = bind(connectionSocket, result->ai_addr, (int)result->ai_addrlen);
-    if (iResult == SOCKET_ERROR) {
-        std::cerr << "bind failed with error: " << WSAGetLastError() << std::endl;
-        freeaddrinfo(result);
+    //Initialisation de l'adresse et du port d'écoute du serveur TCP
+    tcpServerAddr.sin_family = AF_INET;
+    tcpServerAddr.sin_port = htons(9090);
+    tcpServerAddr.sin_addr.s_addr = INADDR_ANY;
+
+    //Bind du socket TCP à son adresse et port d'écoute
+    if (bind(connectionSocket, (sockaddr*)&tcpServerAddr, sizeof(tcpServerAddr)) == SOCKET_ERROR) {
+        std::cerr << "Erreur lors du bind du socket TCP" << std::endl;
         closesocket(connectionSocket);
         WSACleanup();
         exit(1);
     }
 
-    freeaddrinfo(result);
+    cout << "Socket TCP a l'ecoute sur le port 9090" << endl;
 
-    iResult = ::listen(connectionSocket, SOMAXCONN);
-    if (iResult == SOCKET_ERROR) {
-        std::cerr << "Listen failed with error: " << WSAGetLastError() << std::endl;
+    //Mise à l'écoute du socket TCP
+    if (listen(connectionSocket, SOMAXCONN) == SOCKET_ERROR) {
+        std::cerr << "Erreur lors de l'écoute sur le socket TCP." << std::endl;
         closesocket(connectionSocket);
         WSACleanup();
         exit(1);
     }
 
-    // Initialiser l'adresse du serveur
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = INADDR_ANY;
-    servaddr.sin_port = htons(8080);
-
-    // Créer une socket UDP
-    if ((udpSocket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("socket creation failed");
-        exit(EXIT_FAILURE);
+    //--- UDP SOCKET ---//
+    // Initialisation du socket UDP
+    udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (udpSocket == INVALID_SOCKET) {
+        std::cerr << "Erreur lors de la création du socket UDP." << std::endl;
+        closesocket(connectionSocket);
+        WSACleanup();
+        exit(1);
     }
 
-    // Lier la socket à l'adresse du serveur
-    if (bind(udpSocket, (const struct sockaddr*)&servaddr, sizeof(servaddr)) < 0) {
-        perror("bind failed");
-        exit(EXIT_FAILURE);
-    }
+    //Définition de l'adresse et du port d'écoute du socket UDP
+    udpServerAddr.sin_family = AF_INET;
+    udpServerAddr.sin_port = htons(8080);
+    udpServerAddr.sin_addr.s_addr = INADDR_ANY;
 
+    //Bind du socket UDP à son adresse et port d'écoute
+    if (bind(udpSocket, (const sockaddr*)&udpServerAddr, sizeof(udpServerAddr)) == SOCKET_ERROR) {
+        std::cerr << "Erreur lors du bind du socket UDP." << std::endl;
+        closesocket(connectionSocket);
+        closesocket(udpSocket);
+        WSACleanup();
+        exit(1);
+    }
+    cout << "Socket UDP a l'ecoute sur le port 8080" << endl;
+
+    //Mise à l'état non bloquant du socket UDP
     u_long mode = 1;
     ioctlsocket(udpSocket, FIONBIO, &mode);
+
+    //t_check_connections = new thread(&Server::check_connections, this);
+    //cout << "- Check connections thread runs !" << endl;
 
     t_listen_clientsTCP = new thread(&Server::listen_clientsTCP, this);
     cout << "- Listen TCP thread runs !" << endl;
@@ -79,69 +80,101 @@ Server::Server()//gérer les erreurs avec des exceptions
     //t_listen_clientsUDP = new thread(&Server::listen_clientsUDP, this);
     //cout << "- Listen UDP thread runs !" << endl;
     
-    t_send_clientsUDP   = new thread(&Server::send_NEUDP, this);
-    cout << "- Send UDP thread runs !" << endl;
+    //t_send_clientsUDP   = new thread(&Server::send_NEUDP, this);
+    //cout << "- Send UDP thread runs !" << endl;
 
-    t_move_players = new thread(&Server::move_players, this);
-    cout << "- Move players thread runs !" << endl;
+    //t_move_players = new thread(&Server::move_players, this);
+    //cout << "- Move players thread runs !" << endl;
 }
 
 Server::~Server()
 {
-    close();
+    if (t_listen_clientsTCP != nullptr && t_listen_clientsTCP->joinable()) t_listen_clientsTCP->join(); 
+    if (t_listen_clientsUDP != nullptr && t_listen_clientsUDP->joinable()) t_listen_clientsUDP->join();
+    if (t_send_clientsTCP   != nullptr && t_send_clientsTCP->joinable())   t_send_clientsTCP->join();
+    if (t_send_clientsUDP   != nullptr && t_send_clientsUDP->joinable())   t_send_clientsUDP->join();
+    if (t_move_players      != nullptr && t_move_players->joinable())      t_move_players->join();
 
-    if (t_listen_clientsTCP->joinable()) t_listen_clientsTCP->join();
+    delete t_listen_clientsTCP;
+    delete t_listen_clientsUDP;
+    delete t_send_clientsTCP;
+    delete t_send_clientsUDP;
+    delete t_move_players;
 
-    for (auto it = clients.begin(); it != clients.end(); ++it)
+    t_listen_clientsTCP = nullptr;
+    t_listen_clientsUDP = nullptr;
+    t_send_clientsTCP   = nullptr;
+    t_send_clientsUDP   = nullptr;
+    t_move_players      = nullptr;
+
+    for (auto it = players.begin(); it != players.end();)
     {
         delete it->second;
         it->second = nullptr;
+        it = players.erase(it);
     }
 
-    delete t_listen_clientsTCP;
-    t_listen_clientsTCP = nullptr;
-    cout << "Listen thread ended !" << endl;
-
-}
-
-void Server::close()
-{
-    run = false;
-
     closesocket(connectionSocket);
+    closesocket(udpSocket);
     WSACleanup();
 
-    printf("Server closed now !");
+    cout << "Le serveur est complétement nettoyé" << endl;
 }
 
-void Server::listen()
+void Server::accept_connections()
 {
     std::cout << "Waiting for connections..." << std::endl;
     while (run)
     {
         SOCKET* tcpSocket = new SOCKET();
         *tcpSocket = accept(connectionSocket, NULL, NULL);
-        if (*tcpSocket == INVALID_SOCKET) {
-            std::cerr << "accept failed: " << WSAGetLastError() << std::endl;
-            closesocket(connectionSocket);
-            WSACleanup();
-        }
-        else
-        {
-            int id = 0;
-            for (int i = 0; i <= clients.size(); i++)//<= pour parcourir une case de plus et si tout est full alors le player sera placé à la fin (id = size)
+        if (*tcpSocket != INVALID_SOCKET) {
+            int id = -1;//pour donner un id au joueur
+            for (int i = 0; i < MAX_PLAYER_NUMBER; i++)//<= pour parcourir une case de plus et si tout est full alors le player sera placé à la fin (id = size)
             {
-                if (clients[i] == nullptr) { id = i; break; }
+                if (players[i] == nullptr) { id = i; break; }//si on trouve un trou, on met id à i et on sort de la boucle
             }
-            NetworkEntity ne = { id, (1920 + 800) * 100, (1080 + 500) * 100 };
-            clients[id] = new Player(tcpSocket, id, ne.xMap / 100, ne.yMap / 100);
-            clients[id]->sendNETCP(ne);
-            
-            cout << "Connection succeed !" << endl << clients.size() << " clients connected !" << endl;
-        }
+            if (id == -1) 
+            { 
+                cout << "Le serveur est plein..." << endl; //fermer la connexion en fermant le socket et pas en voyant id -1 ???
+                NetworkEntity ne = { id, 0, 0 };//envoie de l'entité avec l'id à -1 pour dire au client que le serveur est plein et fermer son programme
+                Player p(tcpSocket, id, ne.xMap / 100, ne.yMap / 100);
+                p.sendNETCP(ne);
+                continue; 
+            }
+            NetworkEntity ne = { id, 0, (1920 + 800) * 100, (1080 + 500) * 100, 0 };//structure pour communiquer dans le réseau
+            Player* p = new Player(tcpSocket, id, ne.xMap / 100, ne.yMap / 100);
+            p->sendNETCP(ne);//on envoie au joueur sa propre position
+            cout << "PLAYERS SIZE: " << players.size() << endl;
+            players[id] = p;
+            NetworkEntity ne2;
+            for (auto it = players.begin(); it != players.end(); ++it)//on envoie au nouveau joueur la position de tous ceux déjà connectés (la sienne comprise car on vient de l'ajouter)
+            {
+                if (it->second != p)
+                {
+                    it->second->setNE(ne2);
+                    p->sendNETCP(ne2);
+                }
+            }
+            send_NETCP(ne);//On envoie la position du nouveau joueur à tous ceux déjà connectés
 
+
+            cout << "Connection succeed !" << endl << players.size() << " clients " << id << " connected !" << endl;
+        }
+        else std::cerr << "Connexion échoué -> erreur: " << WSAGetLastError() << std::endl;
         std::cout << "Waiting for new connection..." << std::endl;
     }
+}
+
+std::string timestampToTimeString(uint64_t timestamp) {
+    time_t rawTime = static_cast<time_t>(timestamp);
+    struct tm localTime;
+    localtime_s(&localTime, &rawTime);
+
+    char buffer[80];
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &localTime);
+
+    return buffer;
 }
 
 void Server::listen_clientsTCP()
@@ -149,26 +182,20 @@ void Server::listen_clientsTCP()
     fd_set readfds;//structure pour surveiller un ensemble de descripteurs de fichiers pour lire (ici les sockets)
     timeval timeout;
     char recvbuf[512];
-    int recvbuflen = 512;
-    u_long mode = 1;
-
+    const int recvbuflen = 512;
+    
     while (run)
     {
         FD_ZERO(&readfds);//reset l'ensemble &readfds
-        mtx.lock();
-        //clients[]
-        for (auto it = clients.begin(); it != clients.end(); ++it)
+        for (auto it = players.begin(); it != players.end(); ++it)//inutile de lock, la partie qui supprime est après dans la même fonction donc pas de concurrence
         {
-            if (*it->second->getTCPSocket() == INVALID_SOCKET) continue;
-            ioctlsocket(*it->second->getTCPSocket(), FIONBIO, &mode);//mode non bloquant
-            FD_SET(*it->second->getTCPSocket(), &readfds);
+            //if (it->second->isSocketValid()) continue;
+            if(it->second && it->second->isSocketValid()) FD_SET(*it->second->getTCPSocket(), &readfds);
         }
-        mtx.unlock();
-
         // Vérifiez si le fd_set est vide
         if (readfds.fd_count == 0) {
             // Aucun socket à surveiller, attendez un peu avant de réessayer
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
 
@@ -181,30 +208,52 @@ void Server::listen_clientsTCP()
             continue;
         }
 
-        mtx.lock();
-        for (auto it = clients.begin(); it != clients.end();) {
-            SOCKET clientSocket = *(*it).second->getTCPSocket();
-            if (FD_ISSET(clientSocket, &readfds)) {
-                //iResult = recv(clientSocket, recvbuf, recvbuflen, 0);
-                iResult = it->second->recvTCPShort();
-                if (iResult == 0) {
-                    closesocket(clientSocket);
-                    it = clients.erase(it);
-                    std::cout << "A client has been disconnected, " << clients.size() << " left" << std::endl << endl;
-                    continue;
-                }
-                else if(iResult != sizeof(short)) {
-                    std::cerr << "recv failed: " << WSAGetLastError() << std::endl;
-                    closesocket(clientSocket);
-                    it = clients.erase(it);
-                    std::cout << "A client has been disconnected, " << clients.size() << " left" << std::endl << endl;
+        for (auto it = players.begin(); it != players.end();) 
+        {
+            if (!it->second) continue;
+            SOCKET* clientSocket = it->second->getTCPSocket();
+            if (clientSocket && FD_ISSET(*clientSocket, &readfds)) {
+                char buffer[recvbuflen];
+                iResult = recv(*clientSocket, buffer, recvbuflen, 0);
+                if (iResult > 0) {
+                    it->second->recvBuffer.insert(it->second->recvBuffer.end(), buffer, buffer + iResult);
+
+                    while (it->second->recvBuffer.size() >= sizeof(NetworkEntity)) {
+                        NetworkEntity ne;
+                        std::memcpy(&ne, it->second->recvBuffer.data(), sizeof(NetworkEntity));
+                        ne.id        = ntohs(ne.id);
+                        ne.countDir  = ntohs(ne.countDir);
+                        ne.xMap      = ntohl(ne.xMap);
+                        ne.yMap      = ntohl(ne.yMap);
+                        ne.timestamp = ntohll(ne.timestamp); 
+                        uint64_t now = static_cast<uint64_t>(std::time(nullptr));//on update le timestamp à maintenant
+                        //cout << timestampToTimeString(ne.timestamp) << " : " << timestampToTimeString(now) << endl;
+                        //cout << ne.timestamp << " : " << now << endl;
+                        if (ne.timestamp > (now - 5))//on traite les données reçu
+                        {
+                            // Process the received short data
+                            cout << "NE received: " << ne.id << " : " << ne.countDir << " : " << ne.xMap << " : " << ne.yMap << " : " << ne.timestamp << endl;
+                            it->second->update(ne.countDir);
+                        }
+                        else//on ne les traite pas et on renvoie la dernière position
+                        {
+                            it->second->setNE(ne);//met à jour la NE avec les data du joueur dernièrement enregistrées avant de les renvoyer
+                            it->second->sendNETCP(ne);//modifie les données du timestamp pour les envoyer, on ne peut donc pas enregistrer le timestamp ensuite
+                        }
+                        it->second->recvBuffer.erase(it->second->recvBuffer.begin(), it->second->recvBuffer.begin() + sizeof(NetworkEntity));
+                    }
+                } else if (iResult == 0 || iResult == SOCKET_ERROR) {
+                    mtx_sendNETCP.lock();
+                    delete it->second;
+                    it->second = nullptr;
+                    it = players.erase(it);
+                    mtx_sendNETCP.unlock();
+                    std::cout << "A client has been disconnected, " << players.size() << " left" << std::endl;
                     continue;
                 }
             }
             ++it;
         }
-        mtx.unlock();
-        Sleep(1);
     }
 }
 
@@ -214,8 +263,6 @@ void Server::listen_clientsUDP()
 
     fd_set readfds;
     timeval timeout;
-    char recvbuf[512];
-    int recvbuflen = 512;
 
     while (run)
     {
@@ -240,77 +287,98 @@ void Server::listen_clientsUDP()
 
         if (FD_ISSET(udpSocket, &readfds)) {
             sockaddr_in clientAddr;
+            NetworkEntity ne;
             int clientAddrLen = sizeof(clientAddr);
 
-            NetworkEntity ne;
-
             int bytesReceived = recvfrom(udpSocket, (char*)&ne, sizeof(ne), 0, (sockaddr*)&clientAddr, &clientAddrLen);
-            if (bytesReceived == SOCKET_ERROR) {
-                std::cerr << "Erreur lors de la reception des donnees." << std::endl;
+            if (bytesReceived <= 0) std::cerr << "Erreur lors de la reception des donnees." << WSAGetLastError() << std::endl;
+
+            // Vérifiez si le message reçu est complet en comparant la taille des données reçues avec la taille attendue.
+            if (bytesReceived != sizeof(ne)) {
+                std::cerr << "Le message UDP reçu est incomplet." << std::endl;
+                continue; // Si le message n'est pas complet, passez à l'itération suivante.
             }
 
-            //std::cout << "Received message from " << clientIp << endl;
+            if (players[ne.id] != nullptr)
+            {
+                ne.id = htonl(ne.id);
+                ne.xMap = htonl(ne.xMap);
+                ne.yMap = htonl(ne.yMap);
+                float xMap = (float)ne.xMap / 100;
+                float yMap = (float)ne.yMap / 100;
+                players[ne.id]->setAddr(clientAddr);
+                players[ne.id]->setPos(xMap, yMap);
+                sockaddr_in cli = *players[ne.id]->getPAddr();
+                char clientIp[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &(cli.sin_addr), clientIp, INET_ADDRSTRLEN);
+                cout << players[ne.id]->getID() << " : " << players[ne.id]->getXMap() << " : " << players[ne.id]->getYMap() << " : " << clientIp << endl;
+            }
 
-            ne.id = htonl(ne.id);
-            ne.xMap = htonl(ne.xMap);
-            ne.yMap = htonl(ne.yMap);
-            
-            float xMap = ne.xMap / 100;
-            float yMap = ne.yMap / 100;
 
-            mtx.lock();
-            clients[ne.id]->setAddr(clientAddr);
-            clients[ne.id]->setPos(xMap, yMap);
+            //ne.id = htonl(ne.id);
+            //ne.xMap = htonl(ne.xMap);
+            //ne.yMap = htonl(ne.yMap);
+            //int bytesSent = sendto(udpSocket, (const char*)&ne, sizeof(ne), 0, (sockaddr*)clients[ne.id]->getPAddr(), clients[ne.id]->getAddrLen());
+            //if (bytesSent == SOCKET_ERROR) {
+            //    std::cerr << "Erreur lors de l'envoi des donnees -> " << WSAGetLastError() << std::endl;
+            //}
 
-            sockaddr_in cli = *clients[ne.id]->getPAddr();
-            char clientIp[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &(cli.sin_addr), clientIp, INET_ADDRSTRLEN);
-            cout << clients[ne.id]->getID() << " : " << clients[ne.id]->getXMap() << " : " << clients[ne.id]->getYMap() << " : " << clientIp << endl;
-
-            mtx.unlock();
         }
     }  
+}
+
+bool Server::recv_NEUDP(NetworkEntity& ne, sockaddr_in clientAddr)
+{
+    int clientAddrLen = sizeof(clientAddr);
+    int bytesReceived = recvfrom(udpSocket, (char*)&ne, sizeof(ne), 0, (sockaddr*)&clientAddr, &clientAddrLen);
+    if (bytesReceived <= 0) 
+    {
+        std::cerr << "Erreur lors de la reception des donnees." << WSAGetLastError() << std::endl; 
+        return false;
+    }
+
+    ne.id = htonl(ne.id);
+    ne.xMap = htonl(ne.xMap);
+    ne.yMap = htonl(ne.yMap);
+
+    return true;
 }
 
 void Server::send_NEUDP()
 {
     NetworkEntity ne = { 0, 250, 250 };
-    sockaddr_in clientAddr;
-    clientAddr.sin_family = AF_INET;
-    clientAddr.sin_port = htons(8080); // Utiliser le port d'écoute du client
-    inet_pton(AF_INET, "127.0.0.1", &clientAddr.sin_addr);
+    ne.id = htonl(ne.id);
+    ne.xMap = htonl(ne.xMap * 100);
+    ne.yMap = htonl(ne.yMap * 100);
     while (run)
     {
-        ne.id = htonl(ne.id);
-        ne.xMap = htonl(ne.xMap);
-        ne.yMap = htonl(ne.yMap);
-        char buffer[sizeof(ne)];
-        memcpy(buffer, &ne, sizeof(ne));
-        for (auto it = clients.begin(); it != clients.end(); ++it)
+        for (auto it = players.begin(); it != players.end(); ++it)
         {
             if (it->second == nullptr) continue;
-            ne.id = it->second->getID();
-            ne.xMap  = it->second->getXMap() * 100;
-            ne.yMap  = it->second->getYMap() * 100;
-            // Envoi des données sérialisées
-            int bytesSent = sendto(udpSocket, buffer, sizeof(ne), 0, (sockaddr*)&clientAddr, sizeof(clientAddr));
-            if (bytesSent == SOCKET_ERROR) {
-                std::cerr << "Error sending data: " << WSAGetLastError() << std::endl;
+            for (auto it2 = players.begin(); it2 != players.end(); ++it2)
+            {
+                if (players[it->second->getID()]->getPAddr()->sin_family != AF_INET) continue; //vérifie si l'adresse est initialisée
+                if (it2->second == nullptr) continue;
+                ne.id = htonl(it2->second->getID());
+                ne.xMap = htonl(it2->second->getXMap() * 100);
+                ne.yMap = htonl(it2->second->getYMap() * 100);
+                // Envoi des données sérialisées de chaque joueur connecté à it
+                int bytesSent = sendto(udpSocket, (const char*)&ne, sizeof(ne), 0, (sockaddr*)players[it->second->getID()]->getPAddr(), players[it->second->getID()]->getAddrLen());
+                if (bytesSent == SOCKET_ERROR) {
+                    std::cerr << "Erreur lors de l'envoi des donnees -> " << WSAGetLastError() << std::endl;
+                }
             }
         }
-        Sleep(1);
     }
 }
 
-void Server::move_players()
+void Server::send_NETCP(NetworkEntity& ne)
 {
-    while (true)
+    mtx_sendNETCP.lock();
+    for (auto it = players.begin(); it != players.end(); ++it)
     {
-        for (auto it = clients.begin(); it != clients.end(); ++it)
-        {
-            if(it->second != nullptr) it->second->move();
-            //cout << it->second->getXMap() << " : " << it->second->getYMap() << endl;
-        }
-        Sleep(30);
+        it->second->sendNETCP(ne);
     }
+    mtx_sendNETCP.unlock();
 }
+
