@@ -232,9 +232,9 @@ void Server::listen_clientsTCP()
                         if (ne.timestamp > (now - 5))//on traite les données reçu
                         {
                             // Process the received short data
-                            //cout << "NE received: " << ne.id << " : " << ne.countDir << " : " << ne.xMap << " : " << ne.yMap << " : " << ne.timestamp << endl;
                             it->second->update(ne);
-                            send_NETCP(it->second->getNE(), it->second);
+                            //cout << "NE received: " << ne.id << " : " << ne.countDir << " : " << ne.xMap << " : " << ne.yMap << " : " << ne.timestamp << endl;
+                            send_NETCP(ne, it->second);
                         }
                         else//on ne les traite pas et on renvoie la dernière position
                         {
@@ -387,7 +387,7 @@ void Server::send_NETCP(NetworkEntity ne, Player* p)
     {
         if (it->second == p) continue;//on n'envoie pas au joueur sa propre position
         it->second->sendNETCP(ne);
-        cout << "msg sent ofc" << endl;
+        //cout << "msg sent ofc" << endl;
     }
     //mtx_sendNETCP.unlock();
 }

@@ -26,7 +26,8 @@ Player::~Player()
 
 void Player::update(NetworkEntity& ne)
 {
-    switch (ne.countDir)
+    this->countDir = countDir;
+    switch (this->countDir)
     {
         case 0:  xRate = 0;    yRate = 0;               break;
         case 1:  xRate = 0;    yRate = -1;   dir = 0;   break;
@@ -49,7 +50,7 @@ void Player::update(NetworkEntity& ne)
     xMap = (float)ne.xMap / 100;
     yMap = (float)ne.yMap / 100;
 
-    cout << "Player ID: " << ne.id << " position is now: " << xMap << " : " << yMap << endl;
+    //cout << "Player ID: " << ne.id << " position is now: " << xMap << " : " << yMap << " -> countDir: " << countDir << endl;
 }
 
 void Player::move()
@@ -61,8 +62,9 @@ void Player::sendNETCP(NetworkEntity ne)
 	// Envoyer une réponse
 	if (tcpSocket != nullptr)
 	{
-        cout << "SEND NE FROM TCP: " << ne.id << " : " << ne.xMap << " : " << ne.yMap << endl;
+        cout << "SEND NE FROM TCP: " << ne.id << " : " << ne.countDir << " : " << ne.xMap << " : " << ne.yMap << endl;
 		ne.id       = htons(ne.id);
+        ne.countDir = htons(ne.countDir);
 		ne.xMap     = htonl(ne.xMap);
 		ne.yMap     = htonl(ne.yMap);
 		int iResult = ::send(*tcpSocket, reinterpret_cast<const char*>(&ne), sizeof(ne), 0);

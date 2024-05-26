@@ -44,7 +44,7 @@ public:
 	void sendNETCP(NetworkEntity ne);
 	int recvTCP();
 	int recvTCPShort();
-	void setNE(NetworkEntity& ne) { ne.id = id; ne.xMap = xMap * 100; ne.yMap = yMap * 100; }
+	void setNE(NetworkEntity& ne) { ne.id = id; ne.countDir = countDir; ne.xMap = xMap * 100; ne.yMap = yMap * 100; }
 
 	bool connected = true;
 	vector<char> recvBuffer;
