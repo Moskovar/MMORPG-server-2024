@@ -36,7 +36,7 @@ public:
 	
 	//--- joueur ---//
 	void setPos(float xMap, float yMap) { this->xMap = xMap; this->yMap = yMap; }
-	void update(short countDir);
+	void update(NetworkEntity& ne);
 	void move();
 
 	//--- communication ---//

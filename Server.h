@@ -23,7 +23,7 @@ class Server
 		void accept_connections();
 
 	private:
-		bool run = true;
+		bool run = true, isDeleting = false;
 		WSADATA wsaData;
 
 		SOCKET connectionSocket = INVALID_SOCKET;//socket pour recevoir et accepter les connexions des clients
@@ -43,6 +43,6 @@ class Server
 		void recv_TCP();
 		bool recv_NEUDP(NetworkEntity& ne, sockaddr_in clientAddr);
 		void send_NEUDP();
-		void send_NETCP(NetworkEntity& ne);
+		void send_NETCP(NetworkEntity ne, Player* p);
 };
 

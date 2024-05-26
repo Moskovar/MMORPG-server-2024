@@ -24,9 +24,9 @@ Player::~Player()
     cout << "Player cleared !\n" << endl;
 }
 
-void Player::update(short countDir)
+void Player::update(NetworkEntity& ne)
 {
-    switch (countDir)
+    switch (ne.countDir)
     {
         case 0:  xRate = 0;    yRate = 0;               break;
         case 1:  xRate = 0;    yRate = -1;   dir = 0;   break;
@@ -46,6 +46,10 @@ void Player::update(short countDir)
         case 21: xRate = 0;    yRate = 0;               break;
         default: xRate = 0;    yRate = 0;               break;
     }
+    xMap = (float)ne.xMap / 100;
+    yMap = (float)ne.yMap / 100;
+
+    cout << "Player ID: " << ne.id << " position is now: " << xMap << " : " << yMap << endl;
 }
 
 void Player::move()
