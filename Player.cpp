@@ -1,9 +1,10 @@
 #include "Player.h"
 
-Player::Player(SOCKET* tcpSocket, int id, float xMap, float yMap)
+Player::Player(SOCKET* tcpSocket, short id, short hp, float xMap, float yMap)
 {
 	this->tcpSocket = tcpSocket;
 	this->id		= id;
+    this->hp        = hp;
 	this->xMap		= xMap;
 	this->yMap		= yMap;
 
@@ -62,8 +63,9 @@ void Player::sendNETCP(NetworkEntity ne)
 	// Envoyer une réponse
 	if (tcpSocket != nullptr)
 	{
-        cout << "SEND NE FROM TCP: " << ne.id << " : " << ne.countDir << " : " << ne.xMap << " : " << ne.yMap << endl;
+        cout << "SEND NE FROM TCP: " << ne.id << " : " << ne.hp << " : " << ne.countDir << " : " << ne.xMap << " : " << ne.yMap << endl;
 		ne.id       = htons(ne.id);
+        ne.hp       = htons(ne.hp);
         ne.countDir = htons(ne.countDir);
 		ne.xMap     = htonl(ne.xMap);
 		ne.yMap     = htonl(ne.yMap);

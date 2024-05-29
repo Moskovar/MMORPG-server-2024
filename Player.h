@@ -8,7 +8,7 @@
 using namespace std;
 
 struct NetworkEntity {
-	short id = 0, countDir = 0;
+	short id = 0, countDir = 0, hp = 0;
 	int xMap = 0, yMap = 0;
 	uint64_t timestamp = 0; // En microsecondes depuis l'epoch
 };
@@ -22,7 +22,7 @@ struct NetworkEntity {
 class Player
 {
 public:
-	Player(SOCKET* tcpSocket, int id, float xMap, float yMap);
+	Player(SOCKET* tcpSocket, short id, short hp, float xMap, float yMap);
 	~Player();
 
 	bool isSocketValid() { return tcpSocket && *tcpSocket != INVALID_SOCKET; }//enlever le pointeur socket ??
@@ -32,7 +32,7 @@ public:
 	int getAddrLen() { return addrLen; }
 	float getXMap() { return xMap; }
 	float getYMap() { return yMap; }
-	NetworkEntity getNE() { return { id, countDir, (int)xMap*100, (int)yMap*100, 0 }; }
+	NetworkEntity getNE() { return { id, countDir, hp,  (int)xMap*100, (int)yMap*100, 0 }; }
 	
 	//--- joueur ---//
 	void setPos(float xMap, float yMap) { this->xMap = xMap; this->yMap = yMap; }
@@ -52,7 +52,7 @@ public:
 private:
 	SOCKET* tcpSocket = nullptr;
 	sockaddr_in addr = {};
-	short id	   = 0;
+	short id	   = 0    , hp   = 0;
 	int	  addrLen  = 0;
 	short countDir = 0	  ,	dir  = 0;
 	float xMap	   = 0.0f , yMap = 0.0f, xRate = 0.0f, yRate = 0.0f, xChange = 0.0f, yChange = 0.0f, speed = 400;

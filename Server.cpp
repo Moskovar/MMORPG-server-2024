@@ -137,13 +137,13 @@ void Server::accept_connections()
             if (id == -1) 
             { 
                 cout << "Le serveur est plein..." << endl; //fermer la connexion en fermant le socket et pas en voyant id -1 ???
-                NetworkEntity ne = { id, 0, 0 };//envoie de l'entité avec l'id à -1 pour dire au client que le serveur est plein et fermer son programme
-                Player p(tcpSocket, id, ne.xMap / 100, ne.yMap / 100);
+                NetworkEntity ne = { id, 100, 0, 0 };//envoie de l'entité avec l'id à -1 pour dire au client que le serveur est plein et fermer son programme
+                Player p(tcpSocket, id, ne.hp, ne.xMap / 100, ne.yMap / 100);
                 p.sendNETCP(ne);
                 continue; 
             }
-            NetworkEntity ne = { id, 0, (1920 + 800) * 100, (1080 + 500) * 100, 0 };//structure pour communiquer dans le réseau
-            Player* p = new Player(tcpSocket, id, ne.xMap / 100, ne.yMap / 100);
+            NetworkEntity ne = { id, 0, 50, (1920 + 800) * 100, (1080 + 500) * 100, 0 };//structure pour communiquer dans le réseau
+            Player* p = new Player(tcpSocket, id, ne.hp, ne.xMap / 100, ne.yMap / 100);
             p->sendNETCP(ne);//on envoie au joueur sa propre position
             cout << "PLAYERS SIZE: " << players.size() << endl;
             players[id] = p;
@@ -222,6 +222,7 @@ void Server::listen_clientsTCP()
                         NetworkEntity ne;
                         std::memcpy(&ne, it->second->recvBuffer.data(), sizeof(NetworkEntity));
                         ne.id        = ntohs(ne.id);
+                        ne.hp        = ntohs(ne.hp);
                         ne.countDir  = ntohs(ne.countDir);
                         ne.xMap      = ntohl(ne.xMap);
                         ne.yMap      = ntohl(ne.yMap);
