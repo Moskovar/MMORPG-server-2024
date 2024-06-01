@@ -40,9 +40,9 @@ class Server
 		thread* t_move_players		= nullptr;
 		void listen_clientsTCP();
 		void listen_clientsUDP();
-		void recv_TCP();
 		bool recv_NEUDP(NetworkEntity& ne, sockaddr_in clientAddr);
 		void send_NEUDP();
 		void send_NETCP(NetworkEntity ne, Player* p);
+		void send_NESTCP(NetworkEntitySpell nes, Player* p);
 };
 

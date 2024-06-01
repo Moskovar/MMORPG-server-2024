@@ -48,8 +48,10 @@ void Player::update(NetworkEntity& ne)
         case 21: xRate = 0;    yRate = 0;               break;
         default: xRate = 0;    yRate = 0;               break;
     }
-    xMap = (float)ne.xMap / 100;
-    yMap = (float)ne.yMap / 100;
+    xMap  = (float)ne.xMap / 100;
+    yMap  = (float)ne.yMap / 100;
+    hp    = ne.hp;
+    //spell = ne.spell;
 
     //cout << "Player ID: " << ne.id << " position is now: " << xMap << " : " << yMap << " -> countDir: " << countDir << endl;
 }
@@ -64,11 +66,13 @@ void Player::sendNETCP(NetworkEntity ne)
 	if (tcpSocket != nullptr)
 	{
         cout << "SEND NE FROM TCP: " << ne.id << " : " << ne.hp << " : " << ne.countDir << " : " << ne.xMap << " : " << ne.yMap << endl;
+        ne.header   = htons(ne.header);
 		ne.id       = htons(ne.id);
         ne.hp       = htons(ne.hp);
         ne.countDir = htons(ne.countDir);
 		ne.xMap     = htonl(ne.xMap);
 		ne.yMap     = htonl(ne.yMap);
+        //ne.spell    = htons(ne.spell);
 		int iResult = ::send(*tcpSocket, reinterpret_cast<const char*>(&ne), sizeof(ne), 0);
 		if (iResult == SOCKET_ERROR) {
 			std::cerr << "send failed: " << WSAGetLastError() << std::endl;
@@ -77,22 +81,22 @@ void Player::sendNETCP(NetworkEntity ne)
 	}
 }
 
-int Player::recvTCP()
+void Player::sendNESTCP(NetworkEntitySpell nes)
 {
-    char recvbuf[1024];
-    int recvbuflen = 1024;
-	int iResult = 0;
-    // Recevoir des données
+    // Envoyer une réponse
     if (tcpSocket != nullptr)
     {
-        iResult = ::recv(*tcpSocket, recvbuf, recvbuflen - 1, 0);
-        if (iResult > 0) {
-            recvbuf[iResult] = '\0'; // Terminer la chaîne avec un caractère nul
-            //std::cout << "Bytes received: " << iResult << std::endl;
-            std::cout << "Received: " << recvbuf << std::endl;
+        cout << "SEND NES FROM TCP: " << nes.header << " : " << nes.id << " : " << nes.spellID << endl;
+        nes.header  = htons(nes.header);
+        nes.id      = htons(nes.id);
+        nes.spellID = htons(nes.spellID);
+
+        int iResult = ::send(*tcpSocket, reinterpret_cast<const char*>(&nes), sizeof(nes), 0);
+        if (iResult == SOCKET_ERROR) {
+            std::cerr << "send failed: " << WSAGetLastError() << std::endl;
+            closesocket(*tcpSocket);
         }
     }
-    return iResult;
 }
 
 int Player::recvTCPShort()

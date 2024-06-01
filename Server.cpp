@@ -142,7 +142,7 @@ void Server::accept_connections()
                 p.sendNETCP(ne);
                 continue; 
             }
-            NetworkEntity ne = { id, 0, 50, (1920 + 800) * 100, (1080 + 500) * 100, 0 };//structure pour communiquer dans le réseau
+            NetworkEntity ne = { 0, id, 0, 50, (1920 + 800) * 100, (1080 + 500) * 100, 0 };//structure pour communiquer dans le réseau
             Player* p = new Player(tcpSocket, id, ne.hp, ne.xMap / 100, ne.yMap / 100);
             p->sendNETCP(ne);//on envoie au joueur sa propre position
             cout << "PLAYERS SIZE: " << players.size() << endl;
@@ -179,19 +179,16 @@ std::string timestampToTimeString(uint64_t timestamp) {
 
 void Server::listen_clientsTCP()
 {
-    fd_set readfds;//structure pour surveiller un ensemble de descripteurs de fichiers pour lire (ici les sockets)
+    fd_set readfds; // structure pour surveiller un ensemble de descripteurs de fichiers pour lire (ici les sockets)
     timeval timeout;
-    char recvbuf[512];
     const int recvbuflen = 512;
-    
-    while (run)
-    {
-        FD_ZERO(&readfds);//reset l'ensemble &readfds
-        for (auto it = players.begin(); it != players.end(); ++it)//inutile de lock, la partie qui supprime est après dans la même fonction donc pas de concurrence
-        {
-            //if (it->second->isSocketValid()) continue;
-            if(it->second && it->second->isSocketValid()) FD_SET(*it->second->getTCPSocket(), &readfds);
+
+    while (run) {
+        FD_ZERO(&readfds); // reset l'ensemble &readfds
+        for (auto it = players.begin(); it != players.end(); ++it) { // inutile de lock, la partie qui supprime est après dans la même fonction donc pas de concurrence
+            if (it->second && it->second->isSocketValid()) FD_SET(*it->second->getTCPSocket(), &readfds);
         }
+
         // Vérifiez si le fd_set est vide
         if (readfds.fd_count == 0) {
             // Aucun socket à surveiller, attendez un peu avant de réessayer
@@ -202,15 +199,18 @@ void Server::listen_clientsTCP()
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
 
-        int iResult = select(0, &readfds, NULL, NULL, &timeout);//Attend que l'un des sockets dans readfds soit prêt pour la lecture (ou jusqu'à ce que le délai d'attente expire)
+        int iResult = select(0, &readfds, NULL, NULL, &timeout); // Attend que l'un des sockets dans readfds soit prêt pour la lecture (ou jusqu'à ce que le délai d'attente expire)
         if (iResult == SOCKET_ERROR) {
             std::cerr << "Select failed: " << WSAGetLastError() << std::endl;
             continue;
         }
 
-        for (auto it = players.begin(); it != players.end();) 
-        {
-            if (!it->second) continue;
+        for (auto it = players.begin(); it != players.end();) {
+            if (!it->second) {
+                ++it;
+                continue;
+            }
+
             SOCKET* clientSocket = it->second->getTCPSocket();
             if (clientSocket && FD_ISSET(*clientSocket, &readfds)) {
                 char buffer[recvbuflen];
@@ -218,45 +218,77 @@ void Server::listen_clientsTCP()
                 if (iResult > 0) {
                     it->second->recvBuffer.insert(it->second->recvBuffer.end(), buffer, buffer + iResult);
 
-                    while (it->second->recvBuffer.size() >= sizeof(NetworkEntity)) {
-                        NetworkEntity ne;
-                        std::memcpy(&ne, it->second->recvBuffer.data(), sizeof(NetworkEntity));
-                        ne.id        = ntohs(ne.id);
-                        ne.hp        = ntohs(ne.hp);
-                        ne.countDir  = ntohs(ne.countDir);
-                        ne.xMap      = ntohl(ne.xMap);
-                        ne.yMap      = ntohl(ne.yMap);
-                        ne.timestamp = ntohll(ne.timestamp); 
-                        uint64_t now = static_cast<uint64_t>(std::time(nullptr));//on update le timestamp à maintenant
-                        //cout << timestampToTimeString(ne.timestamp) << " : " << timestampToTimeString(now) << endl;
-                        //cout << ne.timestamp << " : " << now << endl;
-                        if (ne.timestamp > (now - 5))//on traite les données reçu
-                        {
-                            // Process the received short data
-                            it->second->update(ne);
-                            //cout << "NE received: " << ne.id << " : " << ne.countDir << " : " << ne.xMap << " : " << ne.yMap << " : " << ne.timestamp << endl;
-                            send_NETCP(ne, it->second);
-                        }
-                        else//on ne les traite pas et on renvoie la dernière position
-                        {
-                            it->second->setNE(ne);//met à jour la NE avec les data du joueur dernièrement enregistrées avant de les renvoyer
-                            it->second->sendNETCP(ne);//modifie les données du timestamp pour les envoyer, on ne peut donc pas enregistrer le timestamp ensuite
-                        }
-                        it->second->recvBuffer.erase(it->second->recvBuffer.begin(), it->second->recvBuffer.begin() + sizeof(NetworkEntity));
-                    }
-                } else if (iResult == 0 || iResult == SOCKET_ERROR) {//UTILISER UN BOOL POUR BLOQUER LES ACTIONS QUAND LE SERVER DELETE ??
-                    //mtx_sendNETCP.lock();
-                    //isDeleting = true;// DOUBLE BOOL NECESSAIRE??!!!
+                    // Process received data
+                    while (it->second->recvBuffer.size() >= sizeof(short)) {
+                        // Check if we have enough data for the header
+                        short header = 0;
+                        std::memcpy(&header, it->second->recvBuffer.data(), sizeof(short));
+                        header = ntohs(header);
+                        cout << "Header: " << header << endl;
 
+                        unsigned long dataSize = 0;
+                        if (header == 0) {
+                            dataSize = sizeof(NetworkEntity);
+                        }
+                        else if (header == 1)
+                        {
+                            dataSize = sizeof(NetworkEntitySpell);
+                        }
+                        // Ajoutez d'autres conditions pour différents types de messages ici
+
+                        if (it->second->recvBuffer.size() >= dataSize) {
+                            // We have enough data to process the message
+                            if (header == 0)
+                            {
+                                NetworkEntity ne;
+                                std::memcpy(&ne, it->second->recvBuffer.data(), sizeof(NetworkEntity));
+                                ne.header = ntohs(ne.header);
+                                ne.id = ntohs(ne.id);
+                                ne.hp = ntohs(ne.hp);
+                                ne.countDir = ntohs(ne.countDir);
+                                ne.xMap = ntohl(ne.xMap);
+                                ne.yMap = ntohl(ne.yMap);
+                                ne.timestamp = ntohll(ne.timestamp);
+                                uint64_t now = static_cast<uint64_t>(std::time(nullptr));
+                                if (ne.timestamp > (now - 5)) {
+                                    // Process the received short data
+                                    it->second->update(ne);
+                                    send_NETCP(ne, it->second);
+                                }
+                                else {
+                                    it->second->setNE(ne);
+                                    it->second->sendNETCP(ne);
+                                }
+                            }
+                            else if (header == 1)
+                            {
+                                NetworkEntitySpell nes;
+                                std::memcpy(&nes, it->second->recvBuffer.data(), sizeof(NetworkEntitySpell));
+                                nes.header  = ntohs(nes.header);
+                                nes.id      = ntohs(nes.id);
+                                nes.spellID = ntohs(nes.spellID);
+
+                                send_NESTCP(nes, it->second);
+
+                                cout << "NES RECEIVED: " << nes.header << " : " << nes.id << " : " << nes.spellID << endl;
+                            }
+
+                            it->second->recvBuffer.erase(it->second->recvBuffer.begin(), it->second->recvBuffer.begin() + dataSize);
+                        }
+                        else {
+                            break; // We don't have enough data yet
+                        }
+                    }
+                }
+                else if (iResult == 0 || iResult == SOCKET_ERROR) {
+                    cout << "ERROR: " << WSAGetLastError() << " : " << iResult << endl;
                     NetworkEntity ne{ it->second->getID(), 0, 0, 0, -1 };
-                    send_NETCP(ne, it->second);//on envoie le signalement de deconnexion du joueur avec un timestamp à -1 (= deconnexion)
-                    if (it->second)
-                    {
+                    send_NETCP(ne, it->second);
+                    if (it->second) {
                         delete it->second;
                         it->second = nullptr;
                     }
                     it = players.erase(it);
-                    //mtx_sendNETCP.unlock();
                     std::cout << "A client has been disconnected, " << players.size() << " left" << std::endl;
                     continue;
                 }
@@ -313,10 +345,12 @@ void Server::listen_clientsUDP()
                 ne.id = htonl(ne.id);
                 ne.xMap = htonl(ne.xMap);
                 ne.yMap = htonl(ne.yMap);
+                //ne.spell = htons(ne.spell);
                 float xMap = (float)ne.xMap / 100;
                 float yMap = (float)ne.yMap / 100;
                 players[ne.id]->setAddr(clientAddr);
                 players[ne.id]->setPos(xMap, yMap);
+                //players[ne.id]->spell = ne.spell;
                 sockaddr_in cli = *players[ne.id]->getPAddr();
                 char clientIp[INET_ADDRSTRLEN];
                 inet_ntop(AF_INET, &(cli.sin_addr), clientIp, INET_ADDRSTRLEN);
@@ -388,6 +422,18 @@ void Server::send_NETCP(NetworkEntity ne, Player* p)
     {
         if (it->second == p) continue;//on n'envoie pas au joueur sa propre position
         it->second->sendNETCP(ne);
+        //cout << "msg sent ofc" << endl;
+    }
+    //mtx_sendNETCP.unlock();
+}
+
+void Server::send_NESTCP(NetworkEntitySpell nes, Player* p)
+{
+    //mtx_sendNETCP.lock();
+    for (auto it = players.begin(); it != players.end(); ++it)
+    {
+        if (it->second == p) continue;//on n'envoie pas au joueur sa propre position
+        it->second->sendNESTCP(nes);
         //cout << "msg sent ofc" << endl;
     }
     //mtx_sendNETCP.unlock();
