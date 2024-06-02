@@ -25,7 +25,7 @@ Player::~Player()
     cout << "Player cleared !\n" << endl;
 }
 
-void Player::update(NetworkEntity& ne)
+void Player::update(uti::NetworkEntity& ne)
 {
     this->countDir = countDir;
     switch (this->countDir)
@@ -60,7 +60,7 @@ void Player::move()
 {
 }
 
-void Player::sendNETCP(NetworkEntity ne)
+void Player::sendNETCP(uti::NetworkEntity ne)
 {
 	// Envoyer une réponse
 	if (tcpSocket != nullptr)
@@ -81,7 +81,7 @@ void Player::sendNETCP(NetworkEntity ne)
 	}
 }
 
-void Player::sendNESTCP(NetworkEntitySpell nes)
+void Player::sendNESTCP(uti::NetworkEntitySpell nes)
 {
     // Envoyer une réponse
     if (tcpSocket != nullptr)
@@ -92,6 +92,24 @@ void Player::sendNESTCP(NetworkEntitySpell nes)
         nes.spellID = htons(nes.spellID);
 
         int iResult = ::send(*tcpSocket, reinterpret_cast<const char*>(&nes), sizeof(nes), 0);
+        if (iResult == SOCKET_ERROR) {
+            std::cerr << "send failed: " << WSAGetLastError() << std::endl;
+            closesocket(*tcpSocket);
+        }
+    }
+}
+
+void Player::sendNEFTCP(uti::NetworkEntityFaction nef)
+{
+    // Envoyer une réponse
+    if (tcpSocket != nullptr)
+    {
+        cout << "SEND NES FROM TCP: " << nef.header << " : " << nef.id << " : " << nef.faction << endl;
+        nef.header  = htons(nef.header);
+        nef.id      = htons(nef.id);
+        nef.faction = htons(nef.faction);
+
+        int iResult = ::send(*tcpSocket, reinterpret_cast<const char*>(&nef), sizeof(nef), 0);
         if (iResult == SOCKET_ERROR) {
             std::cerr << "send failed: " << WSAGetLastError() << std::endl;
             closesocket(*tcpSocket);

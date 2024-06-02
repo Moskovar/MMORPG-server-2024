@@ -5,6 +5,7 @@
 #include <map>
 #include <thread>
 #include <mutex>
+#include <ctime>
 #include "Player.h"
 
 
@@ -40,9 +41,11 @@ class Server
 		thread* t_move_players		= nullptr;
 		void listen_clientsTCP();
 		void listen_clientsUDP();
-		bool recv_NEUDP(NetworkEntity& ne, sockaddr_in clientAddr);
+		void send_NETCP(uti::NetworkEntity ne, Player* p);
+		void send_NESTCP(uti::NetworkEntitySpell nes, Player* p);
+		void send_NEFTCP(uti::NetworkEntityFaction nef, Player* p);
+
+		bool recv_NEUDP(uti::NetworkEntity& ne, sockaddr_in clientAddr);
 		void send_NEUDP();
-		void send_NETCP(NetworkEntity ne, Player* p);
-		void send_NESTCP(NetworkEntitySpell nes, Player* p);
 };
 

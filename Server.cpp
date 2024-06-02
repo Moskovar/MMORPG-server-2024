@@ -1,5 +1,4 @@
 #include "Server.h"
-#include <ctime>
 
 Server::Server()//gérer les erreurs avec des exceptions
 {
@@ -137,26 +136,30 @@ void Server::accept_connections()
             if (id == -1) 
             { 
                 cout << "Le serveur est plein..." << endl; //fermer la connexion en fermant le socket et pas en voyant id -1 ???
-                NetworkEntity ne = { id, 100, 0, 0 };//envoie de l'entité avec l'id à -1 pour dire au client que le serveur est plein et fermer son programme
+                uti::NetworkEntity ne = { id, 100, 0, 0 };//envoie de l'entité avec l'id à -1 pour dire au client que le serveur est plein et fermer son programme
                 Player p(tcpSocket, id, ne.hp, ne.xMap / 100, ne.yMap / 100);
                 p.sendNETCP(ne);
                 continue; 
             }
-            NetworkEntity ne = { 0, id, 0, 50, (1920 + 800) * 100, (1080 + 500) * 100, 0 };//structure pour communiquer dans le réseau
+            uti::NetworkEntity ne = { 0, id, 0, 50, (1920 + 800) * 100, (1080 + 500) * 100, 0 };//structure pour communiquer dans le réseau
             Player* p = new Player(tcpSocket, id, ne.hp, ne.xMap / 100, ne.yMap / 100);
             p->sendNETCP(ne);//on envoie au joueur sa propre position
+            p->sendNEFTCP({ uti::Header::NEF, (short)id, (short)((id % 2) + 1)});
             cout << "PLAYERS SIZE: " << players.size() << endl;
+            p->setFaction(id % 2 + 1);
             players[id] = p;
-            NetworkEntity ne2;
+            uti::NetworkEntity ne2;
             for (auto it = players.begin(); it != players.end(); ++it)//on envoie au nouveau joueur la position de tous ceux déjà connectés (la sienne comprise car on vient de l'ajouter)
             {
                 if (it->second != p)
                 {
                     it->second->setNE(ne2);
                     p->sendNETCP(ne2);
+                    p->sendNEFTCP({ uti::Header::NEF, it->second->getID(), it->second->getFaction()});
                 }
             }
             send_NETCP(ne, p);//On envoie la position du nouveau joueur à tous ceux déjà connectés
+            send_NEFTCP({ uti::Header::NEF, (short)id, (short)((id % 2) + 1) }, p);
 
 
             cout << "Connection succeed !" << endl << players.size() << " clients " << id << " connected !" << endl;
@@ -228,26 +231,27 @@ void Server::listen_clientsTCP()
 
                         unsigned long dataSize = 0;
                         if (header == 0) {
-                            dataSize = sizeof(NetworkEntity);
+                            dataSize = sizeof(uti::NetworkEntity);
                         }
                         else if (header == 1)
                         {
-                            dataSize = sizeof(NetworkEntitySpell);
+                            dataSize = sizeof(uti::NetworkEntitySpell);
                         }
+
                         // Ajoutez d'autres conditions pour différents types de messages ici
 
                         if (it->second->recvBuffer.size() >= dataSize) {
                             // We have enough data to process the message
                             if (header == 0)
                             {
-                                NetworkEntity ne;
-                                std::memcpy(&ne, it->second->recvBuffer.data(), sizeof(NetworkEntity));
-                                ne.header = ntohs(ne.header);
-                                ne.id = ntohs(ne.id);
-                                ne.hp = ntohs(ne.hp);
-                                ne.countDir = ntohs(ne.countDir);
-                                ne.xMap = ntohl(ne.xMap);
-                                ne.yMap = ntohl(ne.yMap);
+                                uti::NetworkEntity ne;
+                                std::memcpy(&ne, it->second->recvBuffer.data(), sizeof(uti::NetworkEntity));
+                                ne.header    = ntohs(ne.header);
+                                ne.id        = ntohs(ne.id);
+                                ne.hp        = ntohs(ne.hp);
+                                ne.countDir  = ntohs(ne.countDir);
+                                ne.xMap      = ntohl(ne.xMap);
+                                ne.yMap      = ntohl(ne.yMap);
                                 ne.timestamp = ntohll(ne.timestamp);
                                 uint64_t now = static_cast<uint64_t>(std::time(nullptr));
                                 if (ne.timestamp > (now - 5)) {
@@ -262,8 +266,8 @@ void Server::listen_clientsTCP()
                             }
                             else if (header == 1)
                             {
-                                NetworkEntitySpell nes;
-                                std::memcpy(&nes, it->second->recvBuffer.data(), sizeof(NetworkEntitySpell));
+                                uti::NetworkEntitySpell nes;
+                                std::memcpy(&nes, it->second->recvBuffer.data(), sizeof(uti::NetworkEntitySpell));
                                 nes.header  = ntohs(nes.header);
                                 nes.id      = ntohs(nes.id);
                                 nes.spellID = ntohs(nes.spellID);
@@ -282,7 +286,7 @@ void Server::listen_clientsTCP()
                 }
                 else if (iResult == 0 || iResult == SOCKET_ERROR) {
                     cout << "ERROR: " << WSAGetLastError() << " : " << iResult << endl;
-                    NetworkEntity ne{ it->second->getID(), 0, 0, 0, -1 };
+                    uti::NetworkEntity ne{ it->second->getID(), 0, 0, 0, -1 };
                     send_NETCP(ne, it->second);
                     if (it->second) {
                         delete it->second;
@@ -328,7 +332,7 @@ void Server::listen_clientsUDP()
 
         if (FD_ISSET(udpSocket, &readfds)) {
             sockaddr_in clientAddr;
-            NetworkEntity ne;
+            uti::NetworkEntity ne;
             int clientAddrLen = sizeof(clientAddr);
 
             int bytesReceived = recvfrom(udpSocket, (char*)&ne, sizeof(ne), 0, (sockaddr*)&clientAddr, &clientAddrLen);
@@ -370,7 +374,7 @@ void Server::listen_clientsUDP()
     }  
 }
 
-bool Server::recv_NEUDP(NetworkEntity& ne, sockaddr_in clientAddr)
+bool Server::recv_NEUDP(uti::NetworkEntity& ne, sockaddr_in clientAddr)
 {
     int clientAddrLen = sizeof(clientAddr);
     int bytesReceived = recvfrom(udpSocket, (char*)&ne, sizeof(ne), 0, (sockaddr*)&clientAddr, &clientAddrLen);
@@ -389,7 +393,7 @@ bool Server::recv_NEUDP(NetworkEntity& ne, sockaddr_in clientAddr)
 
 void Server::send_NEUDP()
 {
-    NetworkEntity ne = { 0, 250, 250 };
+    uti::NetworkEntity ne = { 0, 250, 250 };
     ne.id = htonl(ne.id);
     ne.xMap = htonl(ne.xMap * 100);
     ne.yMap = htonl(ne.yMap * 100);
@@ -415,7 +419,7 @@ void Server::send_NEUDP()
     }
 }
 
-void Server::send_NETCP(NetworkEntity ne, Player* p)
+void Server::send_NETCP(uti::NetworkEntity ne, Player* p)
 {
     //mtx_sendNETCP.lock();
     for (auto it = players.begin(); it != players.end(); ++it)
@@ -427,7 +431,7 @@ void Server::send_NETCP(NetworkEntity ne, Player* p)
     //mtx_sendNETCP.unlock();
 }
 
-void Server::send_NESTCP(NetworkEntitySpell nes, Player* p)
+void Server::send_NESTCP(uti::NetworkEntitySpell nes, Player* p)
 {
     //mtx_sendNETCP.lock();
     for (auto it = players.begin(); it != players.end(); ++it)
@@ -437,5 +441,15 @@ void Server::send_NESTCP(NetworkEntitySpell nes, Player* p)
         //cout << "msg sent ofc" << endl;
     }
     //mtx_sendNETCP.unlock();
+}
+
+void Server::send_NEFTCP(uti::NetworkEntityFaction nef, Player* p)
+{
+    for (auto it = players.begin(); it != players.end(); ++it)
+    {
+        if (it->second == p) continue;//on n'envoie pas au joueur sa propre position
+        it->second->sendNEFTCP(nef);
+        //cout << "msg sent ofc" << endl;
+    }
 }
 
