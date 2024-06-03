@@ -29,11 +29,13 @@ public:
 	void setFaction(short faction) { this->faction = faction; }
 	void update(uti::NetworkEntity& ne);
 	void move();
+	void dealDmg(short dmg) { this->hp -= dmg; }
 
 	//--- communication ---//
 	void setAddr(sockaddr_in addr) { this->addr = addr; addrLen = sizeof(this->addr); }
 	void sendNETCP(uti::NetworkEntity ne);
 	void sendNESTCP(uti::NetworkEntitySpell nes);
+	void sendNESETCP(uti::NetworkEntitySpellEffect nese);
 	void sendNEFTCP(uti::NetworkEntityFaction nef);
 	int recvTCP();
 	int recvTCPShort();

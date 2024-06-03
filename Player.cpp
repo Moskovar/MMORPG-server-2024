@@ -99,6 +99,24 @@ void Player::sendNESTCP(uti::NetworkEntitySpell nes)
     }
 }
 
+void Player::sendNESETCP(uti::NetworkEntitySpellEffect nese)
+{
+    // Envoyer une réponse
+    if (tcpSocket != nullptr)
+    {
+        cout << "SEND NESE FROM TCP: " << nese.header << " : " << nese.id << " : " << nese.spellID << endl;
+        nese.header  = htons(nese.header);
+        nese.id      = htons(nese.id);
+        nese.spellID = htons(nese.spellID);
+
+        int iResult = ::send(*tcpSocket, reinterpret_cast<const char*>(&nese), sizeof(nese), 0);
+        if (iResult == SOCKET_ERROR) {
+            std::cerr << "send failed: " << WSAGetLastError() << std::endl;
+            closesocket(*tcpSocket);
+        }
+    }
+}
+
 void Player::sendNEFTCP(uti::NetworkEntityFaction nef)
 {
     // Envoyer une réponse

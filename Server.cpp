@@ -31,7 +31,7 @@ Server::Server()//gérer les erreurs avec des exceptions
         exit(1);
     }
 
-    cout << "Socket TCP a l'ecoute sur le port 9090" << endl;
+    cout << "Socket TCP a l'ecoute" << endl;
 
     //Mise à l'écoute du socket TCP
     if (listen(connectionSocket, SOMAXCONN) == SOCKET_ERROR) {
@@ -64,7 +64,7 @@ Server::Server()//gérer les erreurs avec des exceptions
         WSACleanup();
         exit(1);
     }
-    cout << "Socket UDP a l'ecoute sur le port 8080" << endl;
+    cout << "Socket UDP a l'ecoute" << endl;
 
     //Mise à l'état non bloquant du socket UDP
     u_long mode = 1;
@@ -237,6 +237,10 @@ void Server::listen_clientsTCP()
                         {
                             dataSize = sizeof(uti::NetworkEntitySpell);
                         }
+                        else if (header == 2)
+                        {
+                            dataSize = sizeof(uti::NetworkEntitySpellEffect);
+                        }
 
                         // Ajoutez d'autres conditions pour différents types de messages ici
 
@@ -276,7 +280,21 @@ void Server::listen_clientsTCP()
 
                                 cout << "NES RECEIVED: " << nes.header << " : " << nes.id << " : " << nes.spellID << endl;
                             }
+                            else if (header == 2)
+                            {
+                                uti::NetworkEntitySpellEffect nese;
+                                std::memcpy(&nese, it->second->recvBuffer.data(), sizeof(uti::NetworkEntitySpell));
+                                nese.header  = ntohs(nese.header);
+                                nese.id      = ntohs(nese.id);
+                                nese.spellID = ntohs(nese.spellID);
 
+                                players[nese.id]->dealDmg(20);
+                                send_NETCP(players[nese.id]->getNE());
+
+                                //send_NESETCP(nese, it->second);
+
+                                cout << "NESE RECEIVED: " << nese.header << " : " << nese.id << " : " << nese.spellID << endl;
+                            }
                             it->second->recvBuffer.erase(it->second->recvBuffer.begin(), it->second->recvBuffer.begin() + dataSize);
                         }
                         else {
@@ -431,6 +449,17 @@ void Server::send_NETCP(uti::NetworkEntity ne, Player* p)
     //mtx_sendNETCP.unlock();
 }
 
+void Server::send_NETCP(uti::NetworkEntity ne)
+{
+    //mtx_sendNETCP.lock();
+    for (auto it = players.begin(); it != players.end(); ++it)
+    {
+        it->second->sendNETCP(ne);
+        //cout << "msg sent ofc" << endl;
+    }
+    //mtx_sendNETCP.unlock();
+}
+
 void Server::send_NESTCP(uti::NetworkEntitySpell nes, Player* p)
 {
     //mtx_sendNETCP.lock();
@@ -438,6 +467,18 @@ void Server::send_NESTCP(uti::NetworkEntitySpell nes, Player* p)
     {
         if (it->second == p) continue;//on n'envoie pas au joueur sa propre position
         it->second->sendNESTCP(nes);
+        //cout << "msg sent ofc" << endl;
+    }
+    //mtx_sendNETCP.unlock();
+}
+
+void Server::send_NESETCP(uti::NetworkEntitySpellEffect nese, Player* p)
+{
+    //mtx_sendNETCP.lock();
+    for (auto it = players.begin(); it != players.end(); ++it)
+    {
+        if (it->second == p) continue;//on n'envoie pas au joueur sa propre position
+        it->second->sendNESETCP(nese);
         //cout << "msg sent ofc" << endl;
     }
     //mtx_sendNETCP.unlock();

@@ -57,7 +57,7 @@ namespace uti {
 #pragma pack(push, 1)
 	struct NetworkEntitySpellEffect {
 		short header = 2;
-		short id = 0, spellID = 0, dmg = 0, heal = 0;
+		short id = 0, spellID = 0;
 	};
 #pragma pack(pop)
 
