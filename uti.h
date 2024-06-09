@@ -38,6 +38,11 @@ namespace uti {
 		float xRate, yRate;
 	};
 
+	enum SpellID {
+		AA = 3,
+		WHIRLWIND = 4
+	};
+
 #pragma pack(push, 1)
 	struct NetworkEntity {
 		short header = 0;

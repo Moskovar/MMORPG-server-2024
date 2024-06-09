@@ -56,22 +56,34 @@ void Player::update(uti::NetworkEntity& ne)
     //cout << "Player ID: " << ne.id << " position is now: " << xMap << " : " << yMap << " -> countDir: " << countDir << endl;
 }
 
-void Player::move()
+void Player::applyDmg(short dmg)
 {
+    if (this->hp + dmg > 100) 
+    { 
+        this->hp = 100; 
+        return; 
+    }
+    else if (this->hp + dmg < 0)
+    {
+        this->hp = 0;
+        return;
+    }
+    this->hp += dmg;
 }
 
 void Player::sendNETCP(uti::NetworkEntity ne)
 {
 	// Envoyer une réponse
-	if (tcpSocket != nullptr)
+	if (tcpSocket)
 	{
-        cout << "SEND NE FROM TCP: " << ne.id << " : " << ne.hp << " : " << ne.countDir << " : " << ne.xMap << " : " << ne.yMap << endl;
-        ne.header   = htons(ne.header);
-		ne.id       = htons(ne.id);
-        ne.hp       = htons(ne.hp);
-        ne.countDir = htons(ne.countDir);
-		ne.xMap     = htonl(ne.xMap);
-		ne.yMap     = htonl(ne.yMap);
+        //cout << "SEND NE FROM TCP: " << ne.id << " : " << ne.hp << " : " << ne.countDir << " : " << ne.xMap << " : " << ne.yMap << endl;
+        ne.header    = htons(ne.header);
+		ne.id        = htons(ne.id);
+        ne.hp        = htons(ne.hp);
+        ne.countDir  = htons(ne.countDir);
+		ne.xMap      = htonl(ne.xMap);
+		ne.yMap      = htonl(ne.yMap);
+        ne.timestamp = htonll(ne.timestamp);
         //ne.spell    = htons(ne.spell);
 		int iResult = ::send(*tcpSocket, reinterpret_cast<const char*>(&ne), sizeof(ne), 0);
 		if (iResult == SOCKET_ERROR) {
@@ -84,9 +96,9 @@ void Player::sendNETCP(uti::NetworkEntity ne)
 void Player::sendNESTCP(uti::NetworkEntitySpell nes)
 {
     // Envoyer une réponse
-    if (tcpSocket != nullptr)
+    if (tcpSocket)
     {
-        cout << "SEND NES FROM TCP: " << nes.header << " : " << nes.id << " : " << nes.spellID << endl;
+        //cout << "SEND NES FROM TCP: " << nes.header << " : " << nes.id << " : " << nes.spellID << endl;
         nes.header  = htons(nes.header);
         nes.id      = htons(nes.id);
         nes.spellID = htons(nes.spellID);
@@ -104,7 +116,7 @@ void Player::sendNESETCP(uti::NetworkEntitySpellEffect nese)
     // Envoyer une réponse
     if (tcpSocket != nullptr)
     {
-        cout << "SEND NESE FROM TCP: " << nese.header << " : " << nese.id << " : " << nese.spellID << endl;
+        //cout << "SEND NESE FROM TCP: " << nese.header << " : " << nese.id << " : " << nese.spellID << endl;
         nese.header  = htons(nese.header);
         nese.id      = htons(nese.id);
         nese.spellID = htons(nese.spellID);
@@ -122,7 +134,7 @@ void Player::sendNEFTCP(uti::NetworkEntityFaction nef)
     // Envoyer une réponse
     if (tcpSocket != nullptr)
     {
-        cout << "SEND NES FROM TCP: " << nef.header << " : " << nef.id << " : " << nef.faction << endl;
+        //cout << "SEND NES FROM TCP: " << nef.header << " : " << nef.id << " : " << nef.faction << endl;
         nef.header  = htons(nef.header);
         nef.id      = htons(nef.id);
         nef.faction = htons(nef.faction);
@@ -133,24 +145,4 @@ void Player::sendNEFTCP(uti::NetworkEntityFaction nef)
             closesocket(*tcpSocket);
         }
     }
-}
-
-int Player::recvTCPShort()
-{
-    int iResult = 0;
-    short data;
-    // Recevoir des données
-    if (tcpSocket != nullptr)
-    {
-        iResult = ::recv(*tcpSocket, (char*)&data, sizeof(data), 0);
-        if (iResult == sizeof(data)) {
-            // Conversion de l'entier de l'ordre du réseau à l'ordre de l'hôte
-            short dataReceived = ntohs(data);
-            //cout << "TCP short received: " << dataReceived << endl;
-            //this->countDir = dataReceived;
-        }
-    }
-
-    //cout << "iResult: " << iResult << endl;
-    return iResult;
 }
