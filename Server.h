@@ -46,6 +46,7 @@ class Server
 		void send_NESTCP(uti::NetworkEntitySpell nes, Player* p);
 		void send_NESETCP(uti::NetworkEntitySpellEffect nese, Player* p);
 		void send_NEFTCP(uti::NetworkEntityFaction nef, Player* p);
+		void send_NETTCP(uti::NetworkEntityTarget net, Player* p);
 
 		bool recv_NEUDP(uti::NetworkEntity& ne, sockaddr_in clientAddr);
 		void send_NEUDP();

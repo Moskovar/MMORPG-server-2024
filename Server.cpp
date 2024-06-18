@@ -20,7 +20,7 @@ Server::Server()//gérer les erreurs avec des exceptions
 
     //Initialisation de l'adresse et du port d'écoute du serveur TCP
     tcpServerAddr.sin_family = AF_INET;
-    tcpServerAddr.sin_port = htons(9090);
+    tcpServerAddr.sin_port = htons(35500);
     tcpServerAddr.sin_addr.s_addr = INADDR_ANY;
 
     //Bind du socket TCP à son adresse et port d'écoute
@@ -237,6 +237,7 @@ void Server::listen_clientsTCP()
                         if      (header == uti::Header::NE)   dataSize = sizeof(uti::NetworkEntity);
                         else if (header == uti::Header::NES)  dataSize = sizeof(uti::NetworkEntitySpell);
                         else if (header == uti::Header::NESE) dataSize = sizeof(uti::NetworkEntitySpellEffect);
+                        else if (header == uti::Header::NET)  dataSize = sizeof(uti::NetworkEntityTarget);
 
                         if (it->second->recvBuffer.size() >= dataSize)
                         {
@@ -297,6 +298,18 @@ void Server::listen_clientsTCP()
 
                                 players[nese.id]->applyDmg(dmg);//envoyer des dommages en checkant les dégàts que fait le sort du joueur et pas avec une flat value
                                 send_NETCP(players[nese.id]->getNE());
+                            }
+                            else if (header == uti::Header::NET)
+                            {
+                                uti::NetworkEntityTarget net;
+                                std::memcpy(&net, it->second->recvBuffer.data(), sizeof(uti::NetworkEntitySpell));
+
+                                net.header = ntohs(net.header);
+                                net.id = ntohs(net.id);
+                                net.targetID = ntohs(net.targetID);
+
+                                cout << "Header: " << net.header << " : " << net.id << " : " << net.targetID << endl;
+                                send_NETTCP(net, players[net.id]);
                             }
                             it->second->recvBuffer.erase(it->second->recvBuffer.begin(), it->second->recvBuffer.begin() + dataSize);
                         }
@@ -469,6 +482,15 @@ void Server::send_NEFTCP(uti::NetworkEntityFaction nef, Player* p)
     {
         if (it->second == p) continue;//on n'envoie pas au joueur sa propre position
         it->second->sendNEFTCP(nef);
+    }
+}
+
+void Server::send_NETTCP(uti::NetworkEntityTarget net, Player* p)
+{
+    for (auto it = players.begin(); it != players.end(); ++it)
+    {
+        if (it->second == p) continue;//on n'envoie pas au joueur sa propre position
+        it->second->sendNETTCP(net);
     }
 }
 

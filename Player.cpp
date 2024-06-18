@@ -146,3 +146,21 @@ void Player::sendNEFTCP(uti::NetworkEntityFaction nef)
         }
     }
 }
+
+void Player::sendNETTCP(uti::NetworkEntityTarget net)
+{
+    // Envoyer une réponse
+    if (tcpSocket != nullptr)
+    {
+        //cout << "SEND NES FROM TCP: " << nef.header << " : " << nef.id << " : " << nef.faction << endl;
+        net.header   = htons(net.header);
+        net.id       = htons(net.id);
+        net.targetID = htons(net.targetID);
+
+        int iResult = ::send(*tcpSocket, reinterpret_cast<const char*>(&net), sizeof(net), 0);
+        if (iResult == SOCKET_ERROR) {
+            std::cerr << "send failed: " << WSAGetLastError() << std::endl;
+            closesocket(*tcpSocket);
+        }
+    }
+}

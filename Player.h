@@ -39,6 +39,7 @@ public:
 	void sendNESTCP(uti::NetworkEntitySpell nes);
 	void sendNESETCP(uti::NetworkEntitySpellEffect nese);
 	void sendNEFTCP(uti::NetworkEntityFaction nef);
+	void sendNETTCP(uti::NetworkEntityTarget net);
 
 	bool connected = true;
 	vector<char> recvBuffer;
